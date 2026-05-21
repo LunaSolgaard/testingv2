@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timezone
 from supabase import create_client
 from playwright.sync_api import sync_playwright
@@ -36,24 +37,35 @@ def get_previous_scan():
         print(f"Warning: could not load previous scan ({e})")
         return {}
 
-def parse_table(page, url):
+def parse_page(page, url, category):
     print(f"  Loading {url} ...")
-    page.goto(url, wait_until="networkidle", timeout=30000)
-    page.screenshot(path=f"screenshot_{url.split('/')[-1]}.png")
-    page.wait_for_selector("table", timeout=15000)
+    page.goto(url, wait_until="networkidle", timeout=60000)
+    # extra wait for JS rendering
+    page.wait_for_timeout(3000)
+    # screenshot for debugging
+    page.screenshot(path=f"screenshot_{category}.png")
+
+    # dump all text from the page
+    text = page.inner_text("body")
+    print(f"  --- RAW TEXT SAMPLE ---")
+    print(text[:500])
+    print(f"  -----------------------")
+
     rows = []
-    trs = page.query_selector_all("table tr")
-    for tr in trs[1:]:
-        cols = tr.query_selector_all("td")
-        if len(cols) < 2:
-            continue
-        name = cols[0].inner_text().strip()
-        try:
-            renown = int(cols[1].inner_text().strip().replace(",", ""))
-        except:
-            renown = 0
-        rows.append({"name": name, "renown": renown})
-    print(f"  → {len(rows)} rows found")
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    for i, line in enumerate(lines):
+        # look for a line that is purely a big number (the renown value)
+        clean = line.replace(",", "")
+        if clean.isdigit() and len(clean) >= 3:
+            renown = int(clean)
+            # the name is likely the line before this one
+            if i > 0:
+                name = lines[i - 1]
+                # skip if name looks like a header or number
+                if name and not name.replace(",", "").isdigit():
+                    rows.append({"name": name, "renown": renown})
+
+    print(f"  → {len(rows)} rows parsed")
     return rows
 
 def scrape_all(prev_scan):
@@ -73,7 +85,7 @@ def scrape_all(prev_scan):
         for category, url in urls.items():
             print(f"Scraping {category}...")
             try:
-                data = parse_table(page, url)
+                data = parse_page(page, url, category)
                 for row in data:
                     key = (row["name"], category)
                     prev_renown = prev_scan.get(key)
