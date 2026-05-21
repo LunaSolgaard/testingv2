@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from supabase import create_client
-
+print("🔥 THIS IS THE LATEST SCRAPER FILE")
 # =========================
 # SUPABASE SETUP
 # =========================
