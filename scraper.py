@@ -1,43 +1,38 @@
-import os
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from supabase import create_client
 
-print("🔥 THIS IS THE LATEST SCRAPER FILE")
+print("🔥 RUNNING FINAL CLEAN SCRAPER")
 
 # =========================
-# SUPABASE SETUP
+# SUPABASE
 # =========================
 SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co"
 SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
 # =========================
-# TIME HELPERS
+# TIME
 # =========================
 def get_time_fields():
-    now_utc = datetime.now(timezone.utc)
-
+    now = datetime.now(timezone.utc)
     return {
-        "timestamptxt": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "timezonetimestampz": now_utc.isoformat()
+        "timestamptxt": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "timezonetimestampz": now.isoformat()
     }
 
-
 # =========================
-# FETCH PAGE
+# FETCH
 # =========================
 def fetch(url):
     r = requests.get(url, timeout=30)
     r.raise_for_status()
     return BeautifulSoup(r.text, "html.parser")
 
-
 # =========================
-# PARSE TABLE
+# PARSE
 # =========================
 def parse_table(soup):
     rows = []
@@ -52,10 +47,9 @@ def parse_table(soup):
             continue
 
         name = cols[0].get_text(strip=True)
-        renown_raw = cols[1].get_text(strip=True)
 
         try:
-            renown = int(renown_raw.replace(",", ""))
+            renown = int(cols[1].get_text(strip=True).replace(",", ""))
         except:
             renown = 0
 
@@ -66,12 +60,11 @@ def parse_table(soup):
 
     return rows
 
-
 # =========================
-# SCRAPE ALL BOARDS
+# SCRAPE ALL (NO BASE_URL)
 # =========================
 def scrape_all():
-    categories = {
+    urls = {
         "fame": "https://leaderboards.arcaneodyssey.dev/fame",
         "bounty": "https://leaderboards.arcaneodyssey.dev/bounty",
         "grand_navy": "https://leaderboards.arcaneodyssey.dev/grand-navy",
@@ -81,7 +74,7 @@ def scrape_all():
     all_rows = []
     time_fields = get_time_fields()
 
-    for category, url in categories.items():
+    for category, url in urls.items():
         print(f"Scraping {category}...")
 
         soup = fetch(url)
@@ -100,18 +93,12 @@ def scrape_all():
 
     return all_rows
 
-
 # =========================
-# UPLOAD TO SUPABASE
+# UPLOAD
 # =========================
 def upload(rows):
-    if not rows:
-        print("No data to upload")
-        return
-
     supabase.table("leaderboard").insert(rows).execute()
     print(f"Uploaded {len(rows)} rows")
-
 
 # =========================
 # MAIN
@@ -119,7 +106,6 @@ def upload(rows):
 def main():
     all_rows = scrape_all()
     upload(all_rows)
-
 
 if __name__ == "__main__":
     main()
