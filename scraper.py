@@ -7,7 +7,7 @@ from supabase import create_client
 print("🔥 THIS IS THE LATEST SCRAPER FILE")
 
 # =========================
-# SUPABASE SETUP (FIXED)
+# SUPABASE SETUP
 # =========================
 SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co"
 SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN"
@@ -68,7 +68,7 @@ def parse_table(soup):
 
 
 # =========================
-# SCRAPE ALL BOARDS (UPDATED URLS)
+# SCRAPE ALL BOARDS
 # =========================
 def scrape_all():
     categories = {
@@ -102,7 +102,7 @@ def scrape_all():
 
 
 # =========================
-# UPLOAD
+# UPLOAD TO SUPABASE
 # =========================
 def upload(rows):
     if not rows:
