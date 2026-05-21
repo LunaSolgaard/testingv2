@@ -4,6 +4,8 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from supabase import create_client
+import uuid
+import re
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -14,9 +16,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 tz = pytz.timezone("America/New_York")
-now = datetime.now(tz)
-timestamp = now.isoformat()
-
+timestamp = datetime.now(tz).isoformat()
+run_id = str(uuid.uuid4())
 
 URLS = {
     "fame": "https://leaderboards.arcaneodyssey.dev/fame",
@@ -28,22 +29,44 @@ URLS = {
 headers = {"User-Agent": "Mozilla/5.0"}
 
 
-def clean_int(value: str):
-    return int(value.replace(",", "").strip())
+def extract_main_stat(text):
+    """
+    Extract the REAL leaderboard stat.
+    We ignore Save File numbers completely.
+    """
+    # remove commas
+    clean = text.replace(",", "")
+
+    # split into numbers
+    nums = re.findall(r"\d+", clean)
+
+    if not nums:
+        return None
+
+    # ❌ RULE: Save File pattern always appears before junk number
+    # We assume:
+    # - last large number = actual stat
+    # - earlier numbers may be Save File or UI junk
+    return int(nums[-1])
 
 
-def get_previous_snapshot():
-    """Get last stored values for comparison"""
-    res = supabase.table("leaderboard").select("*").execute()
-    data = {}
+def extract_name(text):
+    """
+    Remove numbers and known junk keywords.
+    """
+    text = re.sub(r"\d+", "", text)
+    text = text.replace("Save File", "")
+    text = text.strip()
 
-    for row in res.data:
-        data[row["name"]] = row["renown"]
+    # remove repeated UI words
+    bad_words = ["Top", "Leaderboard", "Players", "Updates", "Last", "Updated", "#"]
+    for w in bad_words:
+        text = text.replace(w, "")
 
-    return data
+    return " ".join(text.split()).strip()
 
 
-def scrape_board(url):
+def scrape_board(url, board_name):
     res = requests.get(url, headers=headers, timeout=20)
     res.raise_for_status()
 
@@ -51,92 +74,85 @@ def scrape_board(url):
 
     rows = []
 
-    # 🔥 KEY FIX: leaderboard rows are usually repeated card elements
-    # We filter by elements containing BOTH a number + text pattern
-    candidates = soup.find_all(["div", "tr", "li"])
-
-    for c in candidates:
-        text = " ".join(c.stripped_strings)
+    # grab full visible text blocks
+    for block in soup.find_all("div"):
+        text = " ".join(block.stripped_strings)
 
         if not text:
             continue
 
-        # must contain at least one large number
-        parts = text.split()
-
-        numbers = []
-        for p in parts:
-            if p.replace(",", "").isdigit():
-                numbers.append(p)
-
-        if not numbers:
+        # must contain a number or it's irrelevant
+        if not re.search(r"\d", text):
             continue
 
-        try:
-            value = clean_int(numbers[-1])
-
-            # name = everything before number, cleaned
-            name_parts = []
-            for p in parts:
-                if p.replace(",", "").isdigit():
-                    break
-                name_parts.append(p)
-
-            name = " ".join(name_parts).strip()
-
-            if len(name) < 2:
-                continue
-
-            rows.append({
-                "name": name,
-                "renown": value
-            })
-
-        except:
+        # must NOT be header junk
+        if "Leaderboard" in text and "Save File" not in text:
             continue
 
-    # remove duplicates
+        name = extract_name(text)
+        value = extract_main_stat(text)
+
+        # HARD RULE: ignore Save File noise
+        if "save file" in text.lower():
+            continue
+
+        if not name or value is None:
+            continue
+
+        # final sanity check (ignore UI garbage)
+        if len(name) < 2:
+            continue
+
+        rows.append({
+            "name": name,
+            "renown": value,
+            "board": board_name
+        })
+
+    # dedupe
     seen = set()
     clean = []
+
     for r in rows:
-        if r["name"] not in seen:
-            seen.add(r["name"])
+        key = (r["name"], r["renown"], r["board"])
+        if key not in seen:
+            seen.add(key)
             clean.append(r)
 
     return clean
 
 
-def upload(rows, previous):
+def upload(rows):
     if not rows:
-        print("No rows to upload")
+        print("No rows found")
         return
 
-    for r in rows:
-        old = previous.get(r["name"], 0)
-        change = r["renown"] - old
+    payload = []
 
-        supabase.table("leaderboard").upsert({
+    for r in rows:
+        payload.append({
+            "run_id": run_id,
             "name": r["name"],
             "renown": r["renown"],
-            "renown_change": change,
-            "timezone_time": timestamp
-        }).execute()
+            "board": r["board"],
+            "timestamp": timestamp
+        })
 
-    print(f"Uploaded {len(rows)} rows")
+    supabase.table("leaderboard_history").insert(payload).execute()
+
+    print(f"Uploaded {len(payload)} clean rows")
 
 
 def main():
-    previous = get_previous_snapshot()
-
     all_rows = []
 
-    for name, url in URLS.items():
-        print(f"Scraping {name}...")
-        rows = scrape_board(url)
-        print(f"{name}: {len(rows)} rows scraped")
+    for board, url in URLS.items():
+        print(f"Scraping {board}...")
+        rows = scrape_board(url, board)
+        print(f"{board}: {len(rows)} rows")
         all_rows.extend(rows)
 
-    upload(all_rows, previous)
+    upload(all_rows)
     print("done")
 
 
