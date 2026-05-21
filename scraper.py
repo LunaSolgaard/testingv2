@@ -39,6 +39,7 @@ def get_previous_scan():
 def parse_table(page, url):
     print(f"  Loading {url} ...")
     page.goto(url, wait_until="networkidle", timeout=30000)
+    page.screenshot(path=f"screenshot_{url.split('/')[-1]}.png")
     page.wait_for_selector("table", timeout=15000)
     rows = []
     trs = page.query_selector_all("table tr")
