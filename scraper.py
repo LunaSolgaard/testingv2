@@ -138,7 +138,7 @@ def upload(rows):
             "timestamp": timestamp
         })
 
-    supabase.table("leaderboard_history").insert(payload).execute()
+    supabase.table("leaderboard").insert(payload).execute()
 
     print(f"Uploaded {len(payload)} clean rows")
 
