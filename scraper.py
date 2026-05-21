@@ -16,8 +16,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 eastern = pytz.timezone("America/New_York")
 now = datetime.now(eastern)
 
-timezone_time = now.strftime("%Y-%m-%d %H:%M:%S %Z")
-timestamp = now.isoformat()
+# PostgreSQL timestampz-friendly format
+timezone_time = now.isoformat()
 
 URLS = {
     "fame": "https://leaderboards.arcaneodyssey.dev/fame",
@@ -30,46 +30,62 @@ headers = {
     "User-Agent": "Mozilla/5.0"
 }
 
-def scrape_board(url, board_name):
-    res = requests.get(url, headers=headers)
+
+def to_int(value):
+    """Safely convert scraped numbers like '1,234' -> 1234"""
+    try:
+        return int(value.replace(",", "").strip())
+    except:
+        return None
+
+
+def scrape_board(url):
+    res = requests.get(url, headers=headers, timeout=20)
     res.raise_for_status()
 
     soup = BeautifulSoup(res.text, "html.parser")
 
     rows = []
 
-    # These sites typically use table rows
-    table_rows = soup.find_all("tr")
+    for tr in soup.find_all("tr"):
+        cols = tr.find_all("td")
 
-    for row in table_rows:
-        cols = row.find_all("td")
-        if len(cols) < 2:
+        if len(cols) < 3:
             continue
 
         try:
-            rank = cols[0].get_text(strip=True)
+            rank_text = cols[0].get_text(strip=True)
             name = cols[1].get_text(strip=True)
+            value_text = cols[2].get_text(strip=True)
 
-            if name and rank:
+            rank = to_int(rank_text)
+            value = to_int(value_text)
+
+            if name and rank is not None:
                 rows.append({
                     "name": name,
-                    "renown": rank,  # reuse field for leaderboard value
-                    "renown_change": board_name
+                    "renown": rank,              # int8
+                    "renown_change": value or 0, # int8 fallback
                 })
-        except:
+
+        except Exception as e:
+            print("Row parse error:", e)
             continue
 
     return rows
 
 
 def upload(rows):
+    if not rows:
+        print("No rows to upload")
+        return
+
     for r in rows:
         result = supabase.table("leaderboard").upsert({
-            "name": r["name"],
-            "renown": r["renown"],
-            "renown_change": r["renown_change"],
-            "timezone_time": timezone_time,
-            "timestamp": timestamp
+            "name": r["name"],                       # text
+            "renown": r["renown"],                   # int8
+            "renown_change": r["renown_change"],     # int8
+            "timezone_time": timezone_time           # timestampz
         }).execute()
 
     print(f"Uploaded {len(rows)} rows")
@@ -78,10 +94,10 @@ def upload(rows):
 def main():
     all_rows = []
 
-    for board_name, url in URLS.items():
-        print(f"Scraping {board_name}...")
-        rows = scrape_board(url, board_name)
-        print(f"{board_name}: {len(rows)} rows")
+    for name, url in URLS.items():
+        print(f"Scraping {name}...")
+        rows = scrape_board(url)
+        print(f"{name}: {len(rows)} rows scraped")
         all_rows.extend(rows)
 
     upload(all_rows)
