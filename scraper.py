@@ -3,16 +3,16 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from supabase import create_client
+
 print("🔥 THIS IS THE LATEST SCRAPER FILE")
+
 # =========================
-# SUPABASE SETUP
+# SUPABASE SETUP (FIXED)
 # =========================
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co"
+SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-BASE_URL = "https://YOUR_SITE_HERE.com"
 
 
 # =========================
@@ -68,23 +68,23 @@ def parse_table(soup):
 
 
 # =========================
-# SCRAPE ALL BOARDS
+# SCRAPE ALL BOARDS (UPDATED URLS)
 # =========================
 def scrape_all():
     categories = {
-        "fame": "/fame",
-        "bounty": "/bounty",
-        "grand_navy": "/grand_navy",
-        "assassin_syndicate": "/assassin_syndicate"
+        "fame": "https://leaderboards.arcaneodyssey.dev/fame",
+        "bounty": "https://leaderboards.arcaneodyssey.dev/bounty",
+        "grand_navy": "https://leaderboards.arcaneodyssey.dev/grand-navy",
+        "assassin_syndicate": "https://leaderboards.arcaneodyssey.dev/assassin-syndicate"
     }
 
     all_rows = []
     time_fields = get_time_fields()
 
-    for category, endpoint in categories.items():
+    for category, url in categories.items():
         print(f"Scraping {category}...")
 
-        soup = fetch(BASE_URL + endpoint)
+        soup = fetch(url)
         data = parse_table(soup)
 
         print(f"{category}: {len(data)} rows")
