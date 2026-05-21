@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AO Leaderboard</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f0f0f;
+      color: white;
+      padding: 20px;
+    }
+
+    .box {
+      background: #1c1c1c;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+    }
+
+    .positive { color: #4ade80; }
+    .negative { color: #f87171; }
+  </style>
+</head>
+
+<body>
+
+  <h1>Leaderboard</h1>
+
+  <h2>🔥 Top Changes (Last Update Cycle)</h2>
+  <div id="top-changers"></div>
+
+<script>
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
+  headers: {
+    apikey: SUPABASE_KEY,
+    Authorization: "Bearer " + SUPABASE_KEY
+  }
+})
+.then(res => res.json())
+.then(data => {
+
+  // sort by renown change
+  data.sort((a, b) => b.renown_change - a.renown_change);
+
+  const top = data.slice(0, 10);
+
+  document.getElementById("top-changers").innerHTML =
+    top.map(p => {
+      const change = p.renown_change;
+      const cls = change >= 0 ? "positive" : "negative";
+
+      return `
+        <div class="box">
+          <b>${p.name}</b><br>
+          Change: <span class="${cls}">
+            ${change > 0 ? "+" : ""}${change}
+          </span><br>
+          Current Renown: ${p.renown}
+        </div>
+      `;
+    }).join("");
+
+})
+.catch(err => {
+  document.getElementById("top-changers").innerHTML =
+    "Error loading data: " + err;
+});
+</script>
+
+</body>
+</html>
