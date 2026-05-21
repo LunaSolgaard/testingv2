@@ -1,74 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>AO Leaderboard</title>
+<meta charset="UTF-8">
+<title>AO Tracker Leaderboard</title>
 
-  <style>
+<style>
     body {
-      font-family: Arial;
-      background: #0f0f0f;
-      color: white;
-      padding: 20px;
+        background: #0f1115;
+        color: white;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
     }
 
-    .box {
-      background: #1c1c1c;
-      padding: 15px;
-      margin-bottom: 10px;
-      border-radius: 10px;
+    h1 {
+        text-align: center;
+        margin-bottom: 10px;
     }
 
-    .positive { color: #4ade80; }
-    .negative { color: #f87171; }
-  </style>
+    .sub {
+        text-align: center;
+        color: #aaa;
+        margin-bottom: 30px;
+    }
+
+    .section {
+        margin-bottom: 40px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #161a22;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #222;
+    }
+
+    th {
+        background: #1f2430;
+    }
+
+    .pos {
+        color: #4ade80;
+    }
+
+    .neg {
+        color: #f87171;
+    }
+
+    .top {
+        background: #111827;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    .top h2 {
+        margin-top: 0;
+    }
+
+</style>
 </head>
 
 <body>
 
-  <h1>Leaderboard</h1>
+<h1>Arcane Odyssey Tracker</h1>
+<div class="sub" id="lastUpdate">Loading...</div>
 
-  <h2>🔥 Top Changes (Last Update Cycle)</h2>
-  <div id="top-changers"></div>
+<div class="section top">
+    <h2>🔥 Top Movers</h2>
+    <div id="topMovers"></div>
+</div>
+
+<div class="section">
+    <h2>📊 Leaderboard</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Renown</th>
+                <th>Change</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
 
 <script>
 const SUPABASE_URL = "YOUR_SUPABASE_URL";
 const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
 
-fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
-  headers: {
-    apikey: SUPABASE_KEY,
-    Authorization: "Bearer " + SUPABASE_KEY
-  }
-})
-.then(res => res.json())
-.then(data => {
+async function fetchData() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
+        headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`
+        }
+    });
 
-  // sort by renown change
-  data.sort((a, b) => b.renown_change - a.renown_change);
+    const data = await res.json();
 
-  const top = data.slice(0, 10);
+    render(data);
+}
 
-  document.getElementById("top-changers").innerHTML =
-    top.map(p => {
-      const change = p.renown_change;
-      const cls = change >= 0 ? "positive" : "negative";
+function render(data) {
+    // sort by renown
+    data.sort((a, b) => b.renown - a.renown);
 
-      return `
-        <div class="box">
-          <b>${p.name}</b><br>
-          Change: <span class="${cls}">
-            ${change > 0 ? "+" : ""}${change}
-          </span><br>
-          Current Renown: ${p.renown}
-        </div>
-      `;
-    }).join("");
+    // TOP MOVERS (biggest change)
+    const movers = [...data]
+        .sort((a, b) => Math.abs(b.renown_change) - Math.abs(a.renown_change))
+        .slice(0, 5);
 
-})
-.catch(err => {
-  document.getElementById("top-changers").innerHTML =
-    "Error loading data: " + err;
-});
+    document.getElementById("topMovers").innerHTML =
+        movers.map(p => `
+            <div>
+                <b>${p.name}</b> —
+                <span class="${p.renown_change >= 0 ? "pos" : "neg"}">
+                    ${p.renown_change}
+                </span>
+            </div>
+        `).join("");
+
+    // TABLE
+    document.getElementById("tableBody").innerHTML =
+        data.map(p => `
+            <tr>
+                <td>${p.name}</td>
+                <td>${p.renown}</td>
+                <td class="${p.renown_change >= 0 ? "pos" : "neg"}">
+                    ${p.renown_change}
+                </td>
+            </tr>
+        `).join("");
+
+    document.getElementById("lastUpdate").innerText =
+        "Last updated: " + new Date().toLocaleString();
+}
+
+// auto refresh every 60 seconds
+fetchData();
+setInterval(fetchData, 60000);
 </script>
 
 </body>
