@@ -10,24 +10,24 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def get_time_fields():
     now = datetime.now(timezone.utc)
     return {
-        "timestamptxt":       now.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "timezonetimestampz": now.isoformat()
+        "timestamptxt":  now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "timezone_time": now.isoformat()
     }
 
 def get_previous_scan():
     try:
         result = supabase.table("leaderboard") \
-            .select("timezonetimestampz") \
-            .order("timezonetimestampz", desc=True) \
+            .select("timezone_time") \
+            .order("timezone_time", desc=True) \
             .limit(1) \
             .execute()
         if not result.data:
             print("First run — renownchange will be 0.")
             return {}
-        latest_ts = result.data[0]["timezonetimestampz"]
+        latest_ts = result.data[0]["timezone_time"]
         rows = supabase.table("leaderboard") \
             .select("name,renown,category") \
-            .eq("timezonetimestampz", latest_ts) \
+            .eq("timezone_time", latest_ts) \
             .execute()
         prev = {(row["name"], row["category"]): row["renown"] for row in rows.data}
         print(f"Loaded {len(prev)} entries from previous scan.")
@@ -49,12 +49,9 @@ def parse_page(page, url, category):
         clean = line.replace(",", "")
         if clean.isdigit() and len(clean) >= 3:
             renown = int(clean)
-            # structure is: name → "Save File: X" → number
-            # so name is 2 lines before the number
             if i >= 2:
                 name = lines[i - 2]
                 save_file_line = lines[i - 1]
-                # sanity check: line before number should be "Save File: X"
                 if (name
                     and not name.replace(",", "").isdigit()
                     and not name.startswith("#")
@@ -87,12 +84,12 @@ def scrape_all(prev_scan):
                     prev_renown = prev_scan.get(key)
                     change = (row["renown"] - prev_renown) if prev_renown is not None else 0
                     all_rows.append({
-                        "name":               row["name"],
-                        "renown":             row["renown"],
-                        "renownchange":       change,
-                        "category":           category,
-                        "timestamptxt":       time_fields["timestamptxt"],
-                        "timezonetimestampz": time_fields["timezonetimestampz"]
+                        "name":          row["name"],
+                        "renown":        row["renown"],
+                        "renownchange":  change,
+                        "category":      category,
+                        "timestamptxt":  time_fields["timestamptxt"],
+                        "timezone_time": time_fields["timezone_time"]
                     })
             except Exception as e:
                 print(f"  ERROR scraping {category}: {e}")
