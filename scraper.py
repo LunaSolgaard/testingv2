@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from supabase import create_client
 
-print("🔥 RUNNING CLEAN SCRAPER VERSION")
+
 
 # =========================
 # SUPABASE
