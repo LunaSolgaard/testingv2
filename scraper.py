@@ -3,13 +3,13 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from supabase import create_client
 
-print("🔥 RUNNING FINAL CLEAN SCRAPER")
+print("🔥 RUNNING CLEAN SCRAPER VERSION")
 
 # =========================
-# SUPABASE
+# SUPABASE (KEEP YOUR VALUES)
 # =========================
-SUPABASE_URL = "SUPABASE_URL"
-SUPABASE_KEY = "SUPABASE_KEY"
+SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co"
+SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -24,7 +24,7 @@ def get_time_fields():
     }
 
 # =========================
-# FETCH
+# FETCH HTML
 # =========================
 def fetch(url):
     r = requests.get(url, timeout=30)
@@ -32,7 +32,7 @@ def fetch(url):
     return BeautifulSoup(r.text, "html.parser")
 
 # =========================
-# PARSE
+# PARSE TABLE
 # =========================
 def parse_table(soup):
     rows = []
@@ -61,7 +61,7 @@ def parse_table(soup):
     return rows
 
 # =========================
-# SCRAPE ALL (NO BASE_URL)
+# SCRAPE ALL LEADERBOARDS
 # =========================
 def scrape_all():
     urls = {
@@ -94,9 +94,13 @@ def scrape_all():
     return all_rows
 
 # =========================
-# UPLOAD
+# UPLOAD TO SUPABASE
 # =========================
 def upload(rows):
+    if not rows:
+        print("No data to upload")
+        return
+
     supabase.table("leaderboard").insert(rows).execute()
     print(f"Uploaded {len(rows)} rows")
 
