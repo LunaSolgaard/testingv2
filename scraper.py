@@ -26,7 +26,7 @@ def get_time_fields():
 # =========================
 # FETCH HTML
 # =========================
-def fetch(url):
+def fetch(url):    
     r = requests.get(url, timeout=30)
     r.raise_for_status()
     return BeautifulSoup(r.text, "html.parser")
