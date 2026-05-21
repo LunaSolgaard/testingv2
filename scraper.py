@@ -1,8 +1,10 @@
 import os
+from datetime import datetime
+import pytz
 from supabase import create_client
 
 # =========================
-# CONNECT TO SUPABASE
+# SUPABASE CONNECTION
 # =========================
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -11,9 +13,20 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================
-# FAKE DATA (REPLACE LATER)
+# TIMEZONE SETUP
 # =========================
-# This simulates your scraped leaderboard data
+
+EASTERN = pytz.timezone("America/New_York")
+
+now = datetime.now(EASTERN)
+
+timestamp = now.isoformat()
+date = now.strftime("%Y-%m-%d")
+time = now.strftime("%H:%M:%S")
+
+# =========================
+# FAKE DATA (replace later with scraper)
+# =========================
 
 data = [
     {"name": "Player1", "renown": 1200, "renown_change": 50},
@@ -22,7 +35,7 @@ data = [
 ]
 
 # =========================
-# PUSH TO SUPABASE
+# UPLOAD FUNCTION
 # =========================
 
 def upload_data(rows):
@@ -30,13 +43,18 @@ def upload_data(rows):
         supabase.table("leaderboard").upsert({
             "name": row["name"],
             "renown": row["renown"],
-            "renown_change": row["renown_change"]
+            "renown_change": row["renown_change"],
+
+            # NEW TIME FIELDS
+            "timestamp": timestamp,
+            "date": date,
+            "time": time
         }).execute()
 
-    print("Upload complete!")
+    print(f"Upload complete at {timestamp}")
 
 # =========================
-# MAIN
+# RUN
 # =========================
 
 if __name__ == "__main__":
