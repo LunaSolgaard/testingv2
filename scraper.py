@@ -13,8 +13,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-eastern = pytz.timezone("America/New_York")
-timezone_time = datetime.now(eastern).isoformat()
+tz = pytz.timezone("America/New_York")
+now = datetime.now(tz)
+timestamp = now.isoformat()
+
 
 URLS = {
     "fame": "https://leaderboards.arcaneodyssey.dev/fame",
@@ -23,13 +25,22 @@ URLS = {
     "assassin_syndicate": "https://leaderboards.arcaneodyssey.dev/assassin-syndicate",
 }
 
-headers = {
-    "User-Agent": "Mozilla/5.0"
-}
+headers = {"User-Agent": "Mozilla/5.0"}
 
 
-def extract_text(el):
-    return el.get_text(" ", strip=True) if el else None
+def clean_int(value: str):
+    return int(value.replace(",", "").strip())
+
+
+def get_previous_snapshot():
+    """Get last stored values for comparison"""
+    res = supabase.table("leaderboard").select("*").execute()
+    data = {}
+
+    for row in res.data:
+        data[row["name"]] = row["renown"]
+
+    return data
 
 
 def scrape_board(url):
@@ -40,72 +51,83 @@ def scrape_board(url):
 
     rows = []
 
-    # 🔥 KEY FIX: look for ANY repeated “row-like” containers
-    # These sites usually use div-based leaderboard rows
-    candidates = soup.find_all("div")
+    # 🔥 KEY FIX: leaderboard rows are usually repeated card elements
+    # We filter by elements containing BOTH a number + text pattern
+    candidates = soup.find_all(["div", "tr", "li"])
 
     for c in candidates:
-        text = c.get_text(" ", strip=True)
+        text = " ".join(c.stripped_strings)
 
-        # filter out useless blocks
-        if not text or len(text) < 5:
+        if not text:
             continue
 
-        # heuristic: leaderboard rows usually contain numbers + name
+        # must contain at least one large number
         parts = text.split()
 
-        if len(parts) < 2:
+        numbers = []
+        for p in parts:
+            if p.replace(",", "").isdigit():
+                numbers.append(p)
+
+        if not numbers:
             continue
 
-        # try to detect a name + number pattern
-        name = None
-        number = None
+        try:
+            value = clean_int(numbers[-1])
 
-        for p in parts:
-            if p.isdigit():
-                number = int(p)
-                break
+            # name = everything before number, cleaned
+            name_parts = []
+            for p in parts:
+                if p.replace(",", "").isdigit():
+                    break
+                name_parts.append(p)
 
-        # crude but effective fallback:
-        # assume last word is name if mixed content
-        name = parts[-1]
+            name = " ".join(name_parts).strip()
 
-        if name and number is not None:
+            if len(name) < 2:
+                continue
+
             rows.append({
                 "name": name,
-                "renown": number,
-                "renown_change": 0
+                "renown": value
             })
 
-    # remove duplicates (VERY important for div scraping)
+        except:
+            continue
+
+    # remove duplicates
     seen = set()
     clean = []
     for r in rows:
-        key = (r["name"], r["renown"])
-        if key not in seen:
-            seen.add(key)
+        if r["name"] not in seen:
+            seen.add(r["name"])
             clean.append(r)
 
     return clean
 
 
-def upload(rows):
+def upload(rows, previous):
     if not rows:
         print("No rows to upload")
         return
 
     for r in rows:
+        old = previous.get(r["name"], 0)
+        change = r["renown"] - old
+
         supabase.table("leaderboard").upsert({
             "name": r["name"],
             "renown": r["renown"],
-            "renown_change": r["renown_change"],
-            "timezone_time": timezone_time
+            "renown_change": change,
+            "timezone_time": timestamp
         }).execute()
 
     print(f"Uploaded {len(rows)} rows")
 
 
 def main():
+    previous = get_previous_snapshot()
+
     all_rows = []
 
     for name, url in URLS.items():
@@ -114,7 +136,7 @@ def main():
         print(f"{name}: {len(rows)} rows scraped")
         all_rows.extend(rows)
 
-    upload(all_rows)
+    upload(all_rows, previous)
     print("done")
 
 
