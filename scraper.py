@@ -8,8 +8,8 @@ print("🔥 RUNNING FINAL CLEAN SCRAPER")
 # =========================
 # SUPABASE
 # =========================
-SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co"
-SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN"
+SUPABASE_URL = "SUPABASE_URL"
+SUPABASE_KEY = "SUPABASE_KEY"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
