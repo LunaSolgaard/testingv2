@@ -39,11 +39,10 @@ def get_previous_scan():
 def parse_table(page, url):
     print(f"  Loading {url} ...")
     page.goto(url, wait_until="networkidle", timeout=30000)
-    # wait for the table to actually appear
     page.wait_for_selector("table", timeout=15000)
     rows = []
     trs = page.query_selector_all("table tr")
-    for tr in trs[1:]:  # skip header
+    for tr in trs[1:]:
         cols = tr.query_selector_all("td")
         if len(cols) < 2:
             continue
@@ -69,6 +68,7 @@ def scrape_all(prev_scan):
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
+
         for category, url in urls.items():
             print(f"Scraping {category}...")
             try:
@@ -76,3 +76,33 @@ def scrape_all(prev_scan):
                 for row in data:
                     key = (row["name"], category)
                     prev_renown = prev_scan.get(key)
+                    change = (row["renown"] - prev_renown) if prev_renown is not None else 0
+                    all_rows.append({
+                        "name":               row["name"],
+                        "renown":             row["renown"],
+                        "renownchange":       change,
+                        "category":           category,
+                        "timestamptxt":       time_fields["timestamptxt"],
+                        "timezonetimestampz": time_fields["timezonetimestampz"]
+                    })
+            except Exception as e:
+                print(f"  ERROR scraping {category}: {e}")
+
+        browser.close()
+
+    return all_rows
+
+def upload(rows):
+    if not rows:
+        print("No data to upload.")
+        return
+    supabase.table("leaderboard").insert(rows).execute()
+    print(f"✅ Uploaded {len(rows)} rows")
+
+def main():
+    prev_scan = get_previous_scan()
+    all_rows  = scrape_all(prev_scan)
+    upload(all_rows)
+
+if __name__ == "__main__":
+    main()
