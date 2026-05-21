@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>AO Tracker Leaderboard</title>
-
 <style>
     body {
         background: #0f1115;
@@ -12,22 +11,9 @@
         margin: 0;
         padding: 20px;
     }
-
-    h1 {
-        text-align: center;
-        margin-bottom: 10px;
-    }
-
-    .sub {
-        text-align: center;
-        color: #aaa;
-        margin-bottom: 30px;
-    }
-
-    .section {
-        margin-bottom: 40px;
-    }
-
+    h1 { text-align: center; margin-bottom: 10px; }
+    .sub { text-align: center; color: #aaa; margin-bottom: 30px; }
+    .section { margin-bottom: 40px; }
     table {
         width: 100%;
         border-collapse: collapse;
@@ -35,46 +21,28 @@
         border-radius: 10px;
         overflow: hidden;
     }
-
     th, td {
         padding: 12px;
         text-align: left;
         border-bottom: 1px solid #222;
     }
-
-    th {
-        background: #1f2430;
-    }
-
-    .pos {
-        color: #4ade80;
-    }
-
-    .neg {
-        color: #f87171;
-    }
-
-    .top {
-        background: #111827;
-        padding: 15px;
-        border-radius: 10px;
-    }
-
-    .top h2 {
-        margin-top: 0;
-    }
-
+    th { background: #1f2430; }
+    .pos { color: #4ade80; }
+    .neg { color: #f87171; }
+    .zero { color: #aaa; }
+    .top { background: #111827; padding: 15px; border-radius: 10px; }
+    .top h2 { margin-top: 0; }
+    #error { color: #f87171; text-align: center; display: none; margin-bottom: 20px; }
 </style>
 </head>
-
 <body>
-
 <h1>Arcane Odyssey Tracker</h1>
 <div class="sub" id="lastUpdate">Loading...</div>
+<div id="error">Failed to load data. Check the console for details.</div>
 
 <div class="section top">
     <h2>🔥 Top Movers</h2>
-    <div id="topMovers"></div>
+    <div id="topMovers">Loading...</div>
 </div>
 
 <div class="section">
@@ -82,7 +50,9 @@
     <table>
         <thead>
             <tr>
+                <th>#</th>
                 <th>Name</th>
+                <th>Category</th>
                 <th>Renown</th>
                 <th>Change</th>
             </tr>
@@ -95,58 +65,87 @@
 const SUPABASE_URL = "https://yiskdpphlrrmfhhpwght.supabase.co";
 const SUPABASE_KEY = "sb_publishable_M-1TzpN8Nd2-x5KnyfhghQ_dx0nXKpN";
 
+const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`
+};
+
 async function fetchData() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`
+    try {
+        const tsRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/leaderboard?select=timezonetimestampz&order=timezonetimestampz.desc&limit=1`,
+            { headers }
+        );
+        const tsData = await tsRes.json();
+
+        if (!Array.isArray(tsData) || tsData.length === 0) {
+            document.getElementById("lastUpdate").innerText = "No data yet — run the scraper first.";
+            document.getElementById("topMovers").innerHTML = "<p style='color:#aaa'>No data yet.</p>";
+            return;
         }
-    });
 
-    const data = await res.json();
+        const latestTs = tsData[0].timezonetimestampz;
 
-    render(data);
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/leaderboard?select=*&timezonetimestampz=eq.${encodeURIComponent(latestTs)}&order=renown.desc`,
+            { headers }
+        );
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+            document.getElementById("lastUpdate").innerText = "No data found for latest timestamp.";
+            return;
+        }
+
+        document.getElementById("error").style.display = "none";
+        render(data, latestTs);
+
+    } catch (err) {
+        console.error("Fetch error:", err);
+        document.getElementById("error").style.display = "block";
+        document.getElementById("lastUpdate").innerText = "Error loading data.";
+    }
 }
 
-function render(data) {
-    // sort by renown
-    data.sort((a, b) => b.renown - a.renown);
+function formatChange(val) {
+    if (val === 0) return `<span class="zero">—</span>`;
+    if (val > 0)   return `<span class="pos">+${val.toLocaleString()}</span>`;
+    return              `<span class="neg">${val.toLocaleString()}</span>`;
+}
 
-    // TOP MOVERS (biggest change)
+function render(data, latestTs) {
     const movers = [...data]
-        .sort((a, b) => Math.abs(b.renown_change) - Math.abs(a.renown_change))
+        .filter(p => p.renownchange !== 0)
+        .sort((a, b) => Math.abs(b.renownchange) - Math.abs(a.renownchange))
         .slice(0, 5);
 
-    document.getElementById("topMovers").innerHTML =
-        movers.map(p => `
-            <div>
-                <b>${p.name}</b> —
-                <span class="${p.renown_change >= 0 ? "pos" : "neg"}">
-                    ${p.renown_change}
-                </span>
+    document.getElementById("topMovers").innerHTML = movers.length
+        ? movers.map(p => `
+            <div style="margin-bottom:6px">
+                <b>${p.name}</b>
+                <span style="color:#888;font-size:0.85em"> (${p.category ?? "—"})</span>
+                — ${formatChange(p.renownchange)}
             </div>
-        `).join("");
+          `).join("")
+        : "<p style='color:#aaa'>No changes yet — needs at least 2 scans.</p>";
 
-    // TABLE
-    document.getElementById("tableBody").innerHTML =
-        data.map(p => `
-            <tr>
-                <td>${p.name}</td>
-                <td>${p.renown}</td>
-                <td class="${p.renown_change >= 0 ? "pos" : "neg"}">
-                    ${p.renown_change}
-                </td>
-            </tr>
-        `).join("");
+    document.getElementById("tableBody").innerHTML = data.map((p, i) => `
+        <tr>
+            <td style="color:#888">${i + 1}</td>
+            <td>${p.name}</td>
+            <td style="color:#888;font-size:0.9em">${p.category ?? "—"}</td>
+            <td>${p.renown.toLocaleString()}</td>
+            <td>${formatChange(p.renownchange)}</td>
+        </tr>
+    `).join("");
 
+    const d = new Date(latestTs);
     document.getElementById("lastUpdate").innerText =
-        "Last updated: " + new Date().toLocaleString();
+        "Last scan: " + d.toLocaleString();
 }
 
-// auto refresh every 60 seconds
 fetchData();
 setInterval(fetchData, 60000);
 </script>
-
 </body>
 </html>
