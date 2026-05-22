@@ -4,7 +4,7 @@ from supabase import create_client
 from playwright.sync_api import sync_playwright
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://yiskdpphlrrmfhhpwght.supabase.co")
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]  # must be service_role key, not anon
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_time_fields():
