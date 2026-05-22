@@ -10,7 +10,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def get_time_fields():
     now = datetime.now(timezone.utc)
     return {
-        "timestamptxt":  now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "timestamp":     now.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "timezone_time": now.isoformat()
     }
 
@@ -22,7 +22,7 @@ def get_previous_scan():
             .limit(1) \
             .execute()
         if not result.data:
-            print("First run — renownchange will be 0.")
+            print("First run — renown_change will be 0.")
             return {}
         latest_ts = result.data[0]["timezone_time"]
         rows = supabase.table("leaderboard") \
@@ -86,9 +86,9 @@ def scrape_all(prev_scan):
                     all_rows.append({
                         "name":          row["name"],
                         "renown":        row["renown"],
-                        "renownchange":  change,
+                        "renown_change": change,
                         "category":      category,
-                        "timestamptxt":  time_fields["timestamptxt"],
+                        "timestamp":     time_fields["timestamp"],
                         "timezone_time": time_fields["timezone_time"]
                     })
             except Exception as e:
