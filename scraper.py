@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from supabase import create_client
 from playwright.sync_api import sync_playwright
 
@@ -16,21 +16,27 @@ def get_time_fields():
 
 def get_previous_scan():
     try:
+        six_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+
         result = supabase.table("leaderboard") \
             .select("timezone_time") \
+            .lte("timezone_time", six_hours_ago) \
             .order("timezone_time", desc=True) \
             .limit(1) \
             .execute()
+
         if not result.data:
-            print("First run — renown_change will be 0.")
+            print("No scan found from ~6 hours ago — renown_change will be 0.")
             return {}
+
         latest_ts = result.data[0]["timezone_time"]
         rows = supabase.table("leaderboard") \
             .select("name,renown,category") \
             .eq("timezone_time", latest_ts) \
             .execute()
+
         prev = {(row["name"], row["category"]): row["renown"] for row in rows.data}
-        print(f"Loaded {len(prev)} entries from previous scan.")
+        print(f"Loaded {len(prev)} entries from scan at {latest_ts}")
         return prev
     except Exception as e:
         print(f"Warning: could not load previous scan ({e})")
