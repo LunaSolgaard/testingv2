@@ -108,8 +108,9 @@ function render(data, latestTs) {
             <td>${formatChange(p.renown_change)}</td>
         </tr>`).join("");
 
+    const parsedTs = new Date(latestTs.replace(" ", "T").replace(" UTC", "Z"));
     document.getElementById("lastUpdate").innerText =
-        "Last scan: " + new Date(latestTs).toLocaleString();
+        "Last scan: " + parsedTs.toLocaleString();
 }
 
 fetchData();
